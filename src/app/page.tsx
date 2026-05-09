@@ -21,6 +21,8 @@ import { useEffect, useMemo, useState } from "react";
 import { starterNotes } from "@/data/starterNotes";
 import { loadNotes, saveNotes } from "@/lib/storage";
 import type { Note } from "@/types/note";
+import { exportNotes } from "@/lib/exportNotes";
+import { importNotes } from "@/lib/importNotes";
 
 export default function Home() {
     const [notes, setNotes] = useState<Note[]>(starterNotes);
@@ -48,12 +50,17 @@ export default function Home() {
     const activeNote = notes.find((note) => note.id === activeNoteId);
 
     const filteredNotes = useMemo(() => {
-        return notes.filter((note) => {
-            const searchableText =
-                `${note.title} ${note.body} ${note.section} ${note.vibe}`.toLowerCase();
+        return notes
+            .filter((note) => {
+                const searchableText =
+                    `${note.title} ${note.body} ${note.section} ${note.vibe}`.toLowerCase();
 
-            return searchableText.includes(search.toLowerCase());
-        });
+                return searchableText.includes(search.toLowerCase());
+            })
+            .sort(
+                (a, b) =>
+                    new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+            );
     }, [notes, search]);
 
     function createNote() {
@@ -86,6 +93,12 @@ export default function Home() {
     }
 
     function deleteNote(noteId: string) {
+        const shouldDelete = window.confirm(
+            "Delete this note? This cannot be undone unless you have an exported backup."
+        );
+
+        if (!shouldDelete) return;
+
         const remainingNotes = notes.filter((note) => note.id !== noteId);
 
         setNotes(remainingNotes);
@@ -93,6 +106,25 @@ export default function Home() {
         if (activeNoteId === noteId) {
             setActiveNoteId(remainingNotes[0]?.id ?? "");
         }
+    }
+
+    async function handleImportBackup(
+        event: ChangeEvent<HTMLInputElement>
+    ) {
+        const file = event.target.files?.[0];
+
+        if (!file) return;
+
+        const importedNotes = await importNotes(file);
+
+        if (!importedNotes) {
+            alert("Invalid backup file.");
+            return;
+        }
+
+        setNotes(importedNotes);
+
+        setActiveNoteId(importedNotes[0]?.id ?? "");
     }
 
     return (
@@ -116,13 +148,33 @@ export default function Home() {
                         />
                     </div>
 
-                    <div className="px-4 pb-4">
+                    <div className="space-y-2 px-4 pb-4">
                         <button
                             onClick={createNote}
                             className="w-full rounded-xl bg-[#7C72FF] px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
                         >
                             + New Note
                         </button>
+
+                        <button
+                            onClick={() => exportNotes(notes)}
+                            className="w-full rounded-xl border border-zinc-700 bg-[#171A21] px-4 py-2 text-sm text-zinc-300 transition hover:border-zinc-500"
+                        >
+                            Export Backup
+                        </button>
+
+                        <label className="block">
+                            <input
+                                type="file"
+                                accept=".json"
+                                onChange={handleImportBackup}
+                                className="hidden"
+                            />
+
+                            <div className="cursor-pointer rounded-xl border border-zinc-700 bg-[#171A21] px-4 py-2 text-center text-sm text-zinc-300 transition hover:border-zinc-500">
+                                Import Backup
+                            </div>
+                        </label>
                     </div>
 
                     <div className="flex-1 space-y-2 overflow-y-auto px-3 pb-4">
@@ -134,8 +186,8 @@ export default function Home() {
                                     <div
                                         key={note.id}
                                         className={`group w-full rounded-xl border p-3 text-left transition ${isActive
-                                                ? "border-zinc-700 bg-[#20242D]"
-                                                : "border-transparent hover:border-zinc-700 hover:bg-[#1A1E26]"
+                                            ? "border-zinc-700 bg-[#20242D]"
+                                            : "border-transparent hover:border-zinc-700 hover:bg-[#1A1E26]"
                                             }`}
                                     >
                                         <button
@@ -199,7 +251,7 @@ export default function Home() {
                                     onChange={(event) =>
                                         updateActiveNote({ body: event.target.value })
                                     }
-                                    placeholder="Capture a line before you lose it..."
+                                    placeholder="Hooks, verses, concepts, voice memo transcriptions..."
                                     className="h-[55vh] w-full resize-none bg-transparent text-lg leading-8 text-zinc-200 outline-none placeholder:text-zinc-600"
                                 />
 
