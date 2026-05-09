@@ -128,6 +128,15 @@ export default function Home() {
         setActiveNoteId(importedNotes[0]?.id ?? "");
     }
 
+    function formatLastSaved(dateString: string) {
+        const date = new Date(dateString);
+
+        return date.toLocaleTimeString([], {
+            hour: "numeric",
+            minute: "2-digit",
+        });
+    }
+
     return (
         <main className="h-screen overflow-hidden bg-[#0F1115] text-[#E8E6E3]">
             <div className="flex h-full">
@@ -327,7 +336,11 @@ export default function Home() {
                                     </span>
                                 )}
 
-                                <div className="ml-auto text-zinc-500">Saved locally</div>
+                                <div className="ml-auto text-zinc-500">
+                                    {activeNote
+                                        ? `Saved locally • ${formatLastSaved(activeNote.updatedAt)}`
+                                        : "Saved locally"}
+                                </div>
                             </div>
                         </>
                     ) : (
