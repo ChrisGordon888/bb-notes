@@ -17,6 +17,7 @@
 
 "use client";
 
+import type { ChangeEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { starterNotes } from "@/data/starterNotes";
 import { loadNotes, saveNotes } from "@/lib/storage";
