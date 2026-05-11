@@ -61,3 +61,14 @@ Punch-ins:
 [OUTRO]
 `,
 };
+
+/**
+ * Creates a reusable type from the template object keys.
+ *
+ * Dev tip:
+ * keyof typeof templates automatically becomes:
+ * "blank" | "freestyle" | "songStructureV1" ...
+ *
+ * This prevents typos and keeps the app type-safe.
+ */
+export type TemplateType = keyof typeof templates;
