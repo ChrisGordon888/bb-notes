@@ -3,6 +3,7 @@
 import type { ChangeEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { starterNotes } from "@/data/starterNotes";
+import { templates, type TemplateType } from "@/data/templates";
 import { loadNotes, saveNotes } from "@/lib/storage";
 import type { Note } from "@/types/note";
 import { exportNotes } from "@/lib/exportNotes";
@@ -50,11 +51,11 @@ export default function Home() {
       );
   }, [notes, search]);
 
-  function createNote() {
+  function createNote(templateType: TemplateType = "blank") {
     const newNote: Note = {
       id: crypto.randomUUID(),
       title: "Untitled Note",
-      body: "",
+      body: templates[templateType],
       section: "Concept",
       bpm: "",
       musicalKey: "",
@@ -165,7 +166,7 @@ export default function Home() {
               <p>Create a new note to begin.</p>
 
               <button
-                onClick={createNote}
+                onClick={() => createNote("blank")}
                 className="mt-4 rounded-xl bg-[#7C72FF] px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
               >
                 + New Note
