@@ -11,12 +11,18 @@ import { importNotes } from "@/lib/importNotes";
 import NotesSidebar from "@/components/notes/NotesSidebar";
 import NoteEditor from "@/components/notes/NoteEditor";
 import MetadataBar from "@/components/notes/MetadataBar";
+import CollapsedSidebar from "@/components/notes/CollapsedSidebar";
+
+const SIDEBAR_STORAGE_KEY = "bb-notes-sidebar-collapsed";
 
 export default function Home() {
   const [notes, setNotes] = useState<Note[]>(starterNotes);
   const [activeNoteId, setActiveNoteId] = useState(starterNotes[0]?.id ?? "");
   const [search, setSearch] = useState("");
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [hasLoadedSidebarState, setHasLoadedSidebarState] = useState(false);
+  const [isFocusMode, setIsFocusMode] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     const savedNotes = loadNotes();
@@ -30,10 +36,29 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    const savedSidebarState = window.localStorage.getItem(SIDEBAR_STORAGE_KEY);
+
+    if (savedSidebarState === "true") {
+      setIsSidebarCollapsed(true);
+    }
+
+    setHasLoadedSidebarState(true);
+  }, []);
+
+  useEffect(() => {
     if (!hasLoaded) return;
 
     saveNotes(notes);
   }, [notes, hasLoaded]);
+
+  useEffect(() => {
+    if (!hasLoadedSidebarState) return;
+
+    window.localStorage.setItem(
+      SIDEBAR_STORAGE_KEY,
+      String(isSidebarCollapsed)
+    );
+  }, [isSidebarCollapsed, hasLoadedSidebarState]);
 
   const activeNote = notes.find((note) => note.id === activeNoteId);
 
@@ -66,6 +91,7 @@ export default function Home() {
 
     setNotes((currentNotes) => [newNote, ...currentNotes]);
     setActiveNoteId(newNote.id);
+    setIsFocusMode(false);
   }
 
   function updateActiveNote(updates: Partial<Note>) {
@@ -93,6 +119,7 @@ export default function Home() {
 
     if (activeNoteId === noteId) {
       setActiveNoteId(remainingNotes[0]?.id ?? "");
+      setIsFocusMode(false);
     }
   }
 
@@ -110,6 +137,7 @@ export default function Home() {
 
     setNotes(importedNotes);
     setActiveNoteId(importedNotes[0]?.id ?? "");
+    setIsFocusMode(false);
 
     event.target.value = "";
   }
@@ -126,17 +154,23 @@ export default function Home() {
   return (
     <main className="h-screen overflow-hidden bg-[#0F1115] text-[#E8E6E3]">
       <div className="flex h-full">
-        <NotesSidebar
-          notes={filteredNotes}
-          activeNoteId={activeNoteId}
-          search={search}
-          setSearch={setSearch}
-          createNote={createNote}
-          deleteNote={deleteNote}
-          setActiveNoteId={setActiveNoteId}
-          exportBackup={() => exportNotes(notes)}
-          importBackup={handleImportBackup}
-        />
+        {!isFocusMode &&
+          (isSidebarCollapsed ? (
+            <CollapsedSidebar onExpand={() => setIsSidebarCollapsed(false)} />
+          ) : (
+            <NotesSidebar
+              notes={filteredNotes}
+              activeNoteId={activeNoteId}
+              search={search}
+              setSearch={setSearch}
+              createNote={createNote}
+              deleteNote={deleteNote}
+              setActiveNoteId={setActiveNoteId}
+              exportBackup={() => exportNotes(notes)}
+              importBackup={handleImportBackup}
+              onCollapse={() => setIsSidebarCollapsed(true)}
+            />
+          ))}
 
         <section className="flex flex-1 flex-col">
           <div className="flex items-center gap-2 border-b border-zinc-800 bg-[#171A21] px-4 py-3">
@@ -147,6 +181,15 @@ export default function Home() {
             ) : (
               <p className="text-sm text-zinc-500">No note selected</p>
             )}
+
+            {activeNote && (
+              <button
+                onClick={() => setIsFocusMode((current) => !current)}
+                className="ml-auto rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 transition hover:border-zinc-500 hover:bg-[#20242D]"
+              >
+                {isFocusMode ? "Exit Focus" : "Focus Mode"}
+              </button>
+            )}
           </div>
 
           {activeNote ? (
@@ -156,10 +199,12 @@ export default function Home() {
                 updateActiveNote={updateActiveNote}
               />
 
-              <MetadataBar
-                activeNote={activeNote}
-                formatLastSaved={formatLastSaved}
-              />
+              {!isFocusMode && (
+                <MetadataBar
+                  activeNote={activeNote}
+                  formatLastSaved={formatLastSaved}
+                />
+              )}
             </>
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center text-center text-zinc-500">
