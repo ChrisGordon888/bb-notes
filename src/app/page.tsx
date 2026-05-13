@@ -2,7 +2,6 @@
 
 import type { ChangeEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { starterNotes } from "@/data/starterNotes";
 import { templates, type TemplateType } from "@/data/templates";
 import { loadNotes, saveNotes } from "@/lib/storage";
 import type { Note } from "@/types/note";
@@ -15,14 +14,17 @@ import CollapsedSidebar from "@/components/notes/CollapsedSidebar";
 
 const SIDEBAR_STORAGE_KEY = "bb-notes-sidebar-collapsed";
 
+type MobileView = "notes" | "editor";
+
 export default function Home() {
-  const [notes, setNotes] = useState<Note[]>(starterNotes);
-  const [activeNoteId, setActiveNoteId] = useState(starterNotes[0]?.id ?? "");
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [activeNoteId, setActiveNoteId] = useState("");
   const [search, setSearch] = useState("");
   const [hasLoaded, setHasLoaded] = useState(false);
   const [hasLoadedSidebarState, setHasLoadedSidebarState] = useState(false);
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [mobileView, setMobileView] = useState<MobileView>("notes");
 
   useEffect(() => {
     const savedNotes = loadNotes();
@@ -30,6 +32,7 @@ export default function Home() {
     if (savedNotes) {
       setNotes(savedNotes);
       setActiveNoteId(savedNotes[0]?.id ?? "");
+      setMobileView(savedNotes.length > 0 ? "editor" : "notes");
     }
 
     setHasLoaded(true);
@@ -76,6 +79,11 @@ export default function Home() {
       );
   }, [notes, search]);
 
+  function selectNote(noteId: string) {
+    setActiveNoteId(noteId);
+    setMobileView("editor");
+  }
+
   function createNote(templateType: TemplateType = "blank") {
     const newNote: Note = {
       id: crypto.randomUUID(),
@@ -92,6 +100,7 @@ export default function Home() {
     setNotes((currentNotes) => [newNote, ...currentNotes]);
     setActiveNoteId(newNote.id);
     setIsFocusMode(false);
+    setMobileView("editor");
   }
 
   function updateActiveNote(updates: Partial<Note>) {
@@ -120,6 +129,7 @@ export default function Home() {
     if (activeNoteId === noteId) {
       setActiveNoteId(remainingNotes[0]?.id ?? "");
       setIsFocusMode(false);
+      setMobileView(remainingNotes.length > 0 ? "editor" : "notes");
     }
   }
 
@@ -138,6 +148,7 @@ export default function Home() {
     setNotes(importedNotes);
     setActiveNoteId(importedNotes[0]?.id ?? "");
     setIsFocusMode(false);
+    setMobileView(importedNotes.length > 0 ? "editor" : "notes");
 
     event.target.value = "";
   }
@@ -151,35 +162,73 @@ export default function Home() {
     });
   }
 
+  const shouldShowSidebar =
+    !isFocusMode && (mobileView === "notes" || typeof window === "undefined");
+
   return (
     <main className="h-screen overflow-hidden bg-[#0F1115] text-[#E8E6E3]">
       <div className="flex h-full">
-        {!isFocusMode &&
-          (isSidebarCollapsed ? (
-            <CollapsedSidebar onExpand={() => setIsSidebarCollapsed(false)} />
-          ) : (
-            <NotesSidebar
-              notes={filteredNotes}
-              activeNoteId={activeNoteId}
-              search={search}
-              setSearch={setSearch}
-              createNote={createNote}
-              deleteNote={deleteNote}
-              setActiveNoteId={setActiveNoteId}
-              exportBackup={() => exportNotes(notes)}
-              importBackup={handleImportBackup}
-              onCollapse={() => setIsSidebarCollapsed(true)}
-            />
-          ))}
+        {!isFocusMode && (
+          <>
+            <div className={`${mobileView === "notes" ? "flex" : "hidden"} h-full w-full sm:hidden`}>
+              <NotesSidebar
+                notes={filteredNotes}
+                activeNoteId={activeNoteId}
+                search={search}
+                setSearch={setSearch}
+                createNote={createNote}
+                deleteNote={deleteNote}
+                setActiveNoteId={selectNote}
+                exportBackup={() => exportNotes(notes)}
+                importBackup={handleImportBackup}
+                onCollapse={() => setIsSidebarCollapsed(true)}
+              />
+            </div>
 
-        <section className="flex flex-1 flex-col">
+            <div className="hidden h-full sm:flex">
+              {isSidebarCollapsed ? (
+                <CollapsedSidebar
+                  onExpand={() => setIsSidebarCollapsed(false)}
+                />
+              ) : (
+                <NotesSidebar
+                  notes={filteredNotes}
+                  activeNoteId={activeNoteId}
+                  search={search}
+                  setSearch={setSearch}
+                  createNote={createNote}
+                  deleteNote={deleteNote}
+                  setActiveNoteId={selectNote}
+                  exportBackup={() => exportNotes(notes)}
+                  importBackup={handleImportBackup}
+                  onCollapse={() => setIsSidebarCollapsed(true)}
+                />
+              )}
+            </div>
+          </>
+        )}
+
+        <section
+          className={`flex flex-1 flex-col ${
+            mobileView === "editor" || isFocusMode ? "flex" : "hidden"
+          } sm:flex`}
+        >
           <div className="flex items-center gap-2 border-b border-zinc-800 bg-[#171A21] px-4 py-3">
+            {mobileView === "editor" && !isFocusMode && (
+              <button
+                onClick={() => setMobileView("notes")}
+                className="rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-300 transition hover:border-zinc-500 hover:bg-[#20242D] sm:hidden"
+              >
+                ← Notes
+              </button>
+            )}
+
             {activeNote ? (
               <button className="rounded-lg bg-[#20242D] px-4 py-2 text-sm">
                 {activeNote.title || "Untitled Note"}
               </button>
             ) : (
-              <p className="text-sm text-zinc-500">No note selected</p>
+              <p className="text-sm text-zinc-500">BB Notes</p>
             )}
 
             {activeNote && (
@@ -207,15 +256,42 @@ export default function Home() {
               )}
             </>
           ) : (
-            <div className="flex flex-1 flex-col items-center justify-center text-center text-zinc-500">
-              <p>Create a new note to begin.</p>
+            <div className="flex flex-1 items-center justify-center px-6 text-center">
+              <div className="max-w-xl rounded-3xl border border-zinc-800 bg-[#11151C]/80 p-8 shadow-2xl shadow-black/20">
+                <p className="text-xs font-medium uppercase tracking-[0.24em] text-[#7C72FF]">
+                  Local-first songwriting workspace
+                </p>
 
-              <button
-                onClick={() => createNote("blank")}
-                className="mt-4 rounded-xl bg-[#7C72FF] px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
-              >
-                + New Note
-              </button>
+                <h1 className="mt-4 text-3xl font-semibold tracking-tight text-zinc-100">
+                  Capture hooks, verses, concepts, and song structures.
+                </h1>
+
+                <p className="mt-4 text-sm leading-6 text-zinc-400">
+                  BB Notes saves drafts locally in your browser. No account,
+                  no backend, no setup — just a focused writing space for rough
+                  creative ideas.
+                </p>
+
+                <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+                  <button
+                    onClick={() => createNote("blank")}
+                    className="rounded-xl bg-[#7C72FF] px-5 py-3 text-sm font-medium text-white transition hover:opacity-90"
+                  >
+                    Start Blank
+                  </button>
+
+                  <button
+                    onClick={() => createNote("songStructureV1")}
+                    className="rounded-xl border border-zinc-700 px-5 py-3 text-sm font-medium text-zinc-300 transition hover:border-zinc-500 hover:bg-[#20242D]"
+                  >
+                    Use Song Template
+                  </button>
+                </div>
+
+                <p className="mt-5 text-xs text-zinc-600">
+                  Tip: export backups anytime to keep your lyrics safe.
+                </p>
+              </div>
             </div>
           )}
         </section>
